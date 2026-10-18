@@ -1,0 +1,1010 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>내 숨은 몇 몰?</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: 부스용 터치 TV 한 화면 — 가로: 왼쪽 입력 패드 + 오른쪽 계산 무대 / 세로: 무대 위, 패드 아래 / 좁은 화면: 위아래로 흐름 */
+:root{
+  --ink:#0d1626;      /* 바탕(칠판 남색) */
+  --panel:#142036;
+  --panel-2:#1b2a45;
+  --panel-3:#22365a;
+  --line:#2c4063;
+  --fg:#eef3fb;
+  --muted:#9aaccb;
+  --dim:#5f7394;
+  --tape:#f6c445;     /* 줄자 노랑 */
+  --tape-2:#d9a521;
+  --tape-ink:#352600;
+  --balloon:#ff5c7c;  /* 풍선 */
+  --balloon-hi:#ffa3b6;
+  --balloon-lo:#c2324f;
+  --gas:#5fd2ee;      /* 기체 · 몰 */
+  --good:#66dc9e;
+  --good-bg:#173b30;
+  --ok-bg:#3d3313;
+  --warn:#ffa451;
+  --warn-bg:#40281a;
+  --hi:#ffffff;
+  --font-display:"Black Han Sans","Pretendard","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --font-body:"IBM Plex Sans KR","Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;
+  --font-num:"IBM Plex Mono","SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{font-size:clamp(13px,1.75vmin,30px);background:var(--ink)}
+body{margin:0;background:var(--ink);color:var(--fg);font-family:var(--font-body);font-size:1rem;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+button:focus-visible{outline:3px solid var(--tape);outline-offset:2px}
+sup{font-size:.62em;line-height:0;vertical-align:.55em}
+
+.app{display:grid;grid-template-rows:auto 1fr;row-gap:.8rem;min-height:100%;padding-block:.8rem;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+
+/* 머리 */
+.head{display:grid;grid-template-columns:1fr auto;align-items:center;gap:.6rem 1.2rem}
+.brand{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:.8rem;min-width:0}
+.mark{display:grid;place-items:center;width:3.4rem;height:3.4rem;border:2px solid var(--tape);border-radius:.7rem;font-family:var(--font-num);line-height:1;color:var(--tape)}
+.mark b{font-size:1rem;font-weight:600}
+.mark span{font-size:.62rem;color:var(--muted)}
+h1{margin:0;font-family:var(--font-display);font-weight:400;font-size:2.15rem;line-height:1.05;letter-spacing:.01em}
+.sub{margin:.2rem 0 0;color:var(--muted);font-size:.9rem}
+.head-r{display:grid;grid-auto-flow:column;align-items:center;gap:.6rem}
+.goal{padding:.45rem 1rem;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);font-size:1rem;white-space:nowrap}
+.goal b{font-family:var(--font-num);font-weight:600}
+.goal .gm{color:var(--gas)}
+.goal .gc{color:var(--tape)}
+.temp{display:grid;grid-auto-flow:column;align-items:center;gap:.2rem;padding:.2rem;border-radius:999px;border:1px solid var(--line);background:var(--panel)}
+.temp span{padding:0 .5rem 0 .6rem;color:var(--muted);font-size:.85rem}
+.temp button{border:0;background:transparent;border-radius:999px;padding:.35rem .75rem;font-family:var(--font-num);font-size:.9rem;color:var(--muted)}
+.temp button[aria-pressed="true"]{background:var(--fg);color:var(--ink);font-weight:600}
+.icon-btn{display:grid;place-items:center;width:2.6rem;height:2.6rem;border-radius:.7rem;border:1px solid var(--line);background:var(--panel-2)}
+.icon-btn svg{width:1.2rem;height:1.2rem;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+
+/* 본문 */
+.main{display:grid;gap:.8rem;grid-template-columns:minmax(0,1fr);grid-template-areas:"pad" "viz";min-height:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:1rem;padding:.9rem;min-width:0}
+
+/* 입력 패드 */
+.pad{grid-area:pad;display:grid;gap:.65rem;grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "keys" "actions" "info";align-content:start}
+.pad-head{grid-area:head}
+.lbl{font-size:.95rem;color:var(--muted);font-weight:500}
+.readout{display:grid;grid-template-columns:1fr auto;align-items:baseline;margin-top:.3rem;padding:.3rem 1rem;border:2px solid var(--line);border-radius:.8rem;background:var(--ink)}
+.readout.on{border-color:var(--tape)}
+.readout.err{border-color:var(--warn);animation:shake .45s}
+#cVal{font-family:var(--font-num);font-size:3.5rem;font-weight:600;line-height:1.15;text-align:right;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+#cVal.ph{color:var(--dim)}
+.unit{margin-left:.45rem;font-size:1.5rem;color:var(--muted)}
+.msg{margin:.35rem 0 0;min-height:1.4em;font-size:.92rem;color:var(--muted)}
+.msg.err{color:var(--warn);font-weight:700}
+.keys{grid-area:keys;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:minmax(3.2rem,1fr);gap:.5rem}
+.key{border:1px solid var(--line);border-radius:.7rem;background:var(--panel-2);font-family:var(--font-num);font-size:1.9rem;font-weight:600}
+.key:active,.btn:active{background:var(--panel-3);transform:translateY(1px)}
+.key.fn{font-family:var(--font-body);font-size:1.15rem;color:var(--muted)}
+.actions{grid-area:actions;display:grid;grid-template-columns:1fr 2fr;gap:.5rem}
+.btn{min-height:3.3rem;border-radius:.7rem;border:1px solid var(--line);background:var(--panel-2);font-weight:700;font-size:1.15rem}
+.btn.primary{background:var(--tape);border-color:var(--tape);color:var(--tape-ink);font-size:1.3rem}
+.btn.primary:active{background:var(--tape-2)}
+
+.info{grid-area:info;display:grid;gap:.55rem;align-content:start;padding:.85rem 1rem;border-radius:.8rem;border:1px solid var(--line);background:var(--ink)}
+.info-h{margin:0;font-size:.95rem;font-weight:700;color:var(--muted)}
+.how{margin:0;padding-left:1.25rem;display:grid;gap:.3rem;font-size:1.02rem}
+.how b{color:var(--tape)}
+.goal-line{margin:0;font-size:.95rem;color:var(--muted)}
+.goal-line b{font-family:var(--font-num);color:var(--tape)}
+.res{margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.4rem .8rem}
+.res div{display:grid}
+.res dt{font-size:.8rem;color:var(--muted)}
+.res dd{margin:0;font-family:var(--font-num);font-size:1.25rem;font-weight:600}
+.res-big{display:grid;grid-template-columns:auto auto 1fr;align-items:baseline;gap:.5rem}
+.res-big .k{font-size:1rem;color:var(--muted)}
+.res-big b{font-family:var(--font-num);font-size:3rem;font-weight:600;line-height:1;color:var(--gas)}
+.res-big span:last-child{font-family:var(--font-num);font-size:1.3rem;color:var(--muted)}
+.res-n{margin:0;font-size:1rem}
+.res-n b{font-family:var(--font-num);font-weight:600}
+.q{color:var(--dim)!important}
+.badge{margin:0;padding:.5rem .8rem;border-radius:.6rem;font-weight:700;font-size:1.05rem}
+.badge.good{background:var(--good-bg);color:var(--good)}
+.badge.ok{background:var(--ok-bg);color:var(--tape)}
+.badge.warn{background:var(--warn-bg);color:var(--warn)}
+.badge.wait{background:var(--panel-2);color:var(--dim)}
+
+/* 계산 무대 */
+.viz{grid-area:viz;display:grid;gap:.7rem;grid-template-columns:minmax(0,1fr)}
+.viz-top{display:grid;grid-template-columns:1fr auto;align-items:center;gap:.6rem}
+.tabs{display:grid;grid-auto-flow:column;justify-content:start;gap:.4rem}
+.tab{white-space:nowrap;padding:.5rem 1rem;border-radius:.65rem;border:1px solid var(--line);background:transparent;color:var(--muted);font-weight:700;font-size:1rem}
+.tab[aria-selected="true"]{background:var(--fg);border-color:var(--fg);color:var(--ink)}
+.ctrl{display:grid;grid-auto-flow:column;gap:.35rem}
+.cbtn{white-space:nowrap;display:grid;grid-auto-flow:column;align-items:center;gap:.35rem;padding:.45rem .75rem;border-radius:.65rem;border:1px solid var(--line);background:var(--panel-2);font-size:.92rem;font-weight:500}
+.cbtn svg{width:.95em;height:.95em;fill:currentColor}
+.cbtn.play{min-width:5.6rem;justify-content:center}
+.caption{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:.9rem;min-height:3.6rem}
+.cap-k{display:grid;grid-auto-flow:column;align-items:center;gap:.5rem;font-family:var(--font-display);font-size:1.7rem;color:var(--tape);white-space:nowrap}
+.cap-t{margin:0;font-size:1.18rem;line-height:1.45;max-width:62ch;text-wrap:pretty}
+.no{display:inline-grid;place-items:center;width:1.5em;height:1.5em;border-radius:50%;background:var(--tape);color:var(--tape-ink);font-family:var(--font-num);font-size:.62em;font-weight:600;line-height:1}
+.stage{grid-area:auto;position:relative;border-radius:.8rem;border:1px solid var(--line);background:var(--ink);overflow:hidden;min-height:0}
+.stage svg{display:block;width:100%;height:auto}
+
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
+.steps li{display:grid;min-width:0}
+.step{position:relative;display:grid;align-content:start;gap:.12rem;width:100%;padding:.55rem .7rem .7rem;text-align:left;border-radius:.7rem;border:1px solid var(--line);background:var(--panel-2);overflow:hidden}
+.step .k{display:grid;grid-auto-flow:column;justify-content:start;align-items:center;gap:.35rem;font-size:.88rem;font-weight:700;color:var(--muted)}
+.step .k .no{background:var(--dim);color:var(--ink)}
+.step .f{font-size:.88rem;color:var(--fg)}
+.step .s{font-family:var(--font-num);font-size:.8rem;color:var(--muted);overflow-wrap:anywhere}
+.step .v{font-family:var(--font-num);font-size:1.3rem;font-weight:600;line-height:1.2;color:var(--fg)}
+.step .v small{display:block;font-size:.72em;color:var(--muted);font-weight:500}
+.step.done .v{color:var(--gas)}
+.step.done .k .no{background:var(--gas)}
+.step.up{background:transparent}
+.step.up .v{color:var(--dim)}
+.step.on{border-color:var(--tape);background:var(--panel-3)}
+.step.on .k{color:var(--tape)}
+.step.on .k .no{background:var(--tape)}
+.step .bar{position:absolute;left:0;right:0;bottom:0;height:4px;background:var(--tape);transform-origin:0 50%;transform:scaleX(0)}
+.step.on.run .bar{animation-name:barrun;animation-timing-function:linear;animation-fill-mode:forwards}
+@keyframes barrun{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.foot{margin:0;font-size:.8rem;color:var(--dim)}
+
+/* 분수: 분자 위 · 분모 아래 (교과서 표기) */
+.fr{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;font-size:.82em;line-height:1.12;margin:0 .1em}
+.fr>span{padding:0 .16em;white-space:nowrap}
+.fr>span:first-child{border-bottom:.08em solid currentColor;padding-bottom:.03em}
+.fr>span:last-child{padding-top:.05em}
+.step .fr{font-size:.95em}
+
+/* 무대 안 HTML 조각(구하는 식 카드 · 분수 줄) */
+.sv foreignObject{overflow:visible}
+.fc{box-sizing:border-box;width:100%;height:100%;display:flex;flex-direction:column;justify-content:space-between;padding:18px 28px 16px;border:2px solid var(--line);border-radius:18px;background:var(--panel-2);color:var(--fg);font-family:var(--font-num);overflow:hidden}
+.fc-k{font-family:var(--font-body);font-size:21px;font-weight:700;line-height:1.2;color:var(--tape)}
+.fc-l{white-space:nowrap;line-height:1.1}
+.fc-h{font-family:var(--font-body);font-size:19px;line-height:1.3;color:var(--muted);white-space:nowrap}
+.fo-line{box-sizing:border-box;height:100%;display:flex;align-items:center;white-space:nowrap;font-family:var(--font-num);font-weight:600;color:var(--fg)}
+.c-gas{color:var(--gas)}
+.c-tape{color:var(--tape)}
+
+/* 무대 안 그림(SVG) */
+.sv text{font-family:var(--font-body);fill:var(--fg)}
+.sv .num{font-family:var(--font-num)}
+.sv .disp{font-family:var(--font-display)}
+.sv .t-muted{fill:var(--muted)}
+.sv .t-tape{fill:var(--tape)}
+.sv .t-gas{fill:var(--gas)}
+.sv .t-bal{fill:var(--balloon-hi)}
+.sv .t-good{fill:var(--good)}
+.sv .t-warn{fill:var(--warn)}
+.sv .t-ink{fill:var(--tape-ink)}
+.sv .halo{paint-order:stroke;stroke:var(--ink);stroke-width:6px;stroke-linejoin:round}
+.sv .s1{stop-color:var(--balloon-hi)}
+.sv .s2{stop-color:var(--balloon)}
+.sv .s3{stop-color:var(--balloon-lo)}
+.sv .string{fill:none;stroke:var(--muted);stroke-width:2}
+.sv .knot{fill:var(--balloon-lo)}
+.sv .bl-hi{fill:var(--hi);opacity:.3}
+.sv .ghost{fill:none;stroke:var(--gas);stroke-width:3;stroke-dasharray:10 8}
+.sv .ghost-knot{fill:none;stroke:var(--gas);stroke-width:2}
+.sv .eq-front{fill:none;stroke:var(--tape);stroke-width:12;stroke-linecap:round}
+.sv .eq-front.dim{opacity:.4}
+.sv .eq-back{fill:none;stroke:var(--tape);stroke-width:6;stroke-dasharray:8 10;opacity:.4}
+.sv .lead{fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:4 5}
+.sv .tape{fill:var(--tape)}
+.sv .tape-case{fill:var(--tape-2);stroke:var(--tape-ink);stroke-width:2}
+.sv .tape-hole{fill:var(--tape-ink)}
+.sv .tick{stroke:var(--tape-ink);stroke-width:2}
+.sv .endmark{stroke:var(--fg);stroke-width:2.5}
+.sv .seg-a{fill:var(--tape)}
+.sv .seg-b{fill:var(--tape-2)}
+.sv .seg-r{fill:var(--gas)}
+.sv .rad{fill:none;stroke:var(--gas);stroke-width:6;stroke-linecap:round}
+.sv .ctr{fill:var(--gas)}
+.sv .box{fill:none;stroke:var(--muted);stroke-width:2}
+.sv .box-fill{fill:var(--gas);opacity:.85}
+.sv .cont{fill:none;stroke:var(--fg);stroke-width:3}
+.sv .slot{stroke:var(--line);stroke-width:2;stroke-dasharray:6 6}
+.sv .gas-fill{fill:var(--gas);opacity:.75}
+.sv .mini{fill:none;stroke:var(--muted);stroke-width:1.6;opacity:.6}
+.sv .brk{fill:none;stroke:var(--tape);stroke-width:2.5}
+.sv .mk{fill:var(--balloon)}
+.sv .dot{fill:var(--gas)}
+.sv .axis{stroke:var(--muted);stroke-width:3}
+.sv .axis-t{stroke:var(--muted);stroke-width:2}
+.sv .band{fill:var(--good);opacity:.28}
+.sv .tline{stroke:var(--gas);stroke-width:4}
+
+/* 움직임 — 시작 상태는 keyframes 안에만 두어 움직임을 끄면 완성된 그림이 보이게 */
+.sv .a-draw{stroke-dasharray:1;animation:draw 1.1s ease-out both}
+@keyframes draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+.sv .a-gx{transform-box:fill-box;transform-origin:0 50%;animation:gx 1s cubic-bezier(.2,.7,.2,1) both}
+@keyframes gx{from{transform:scaleX(0)}}
+.sv .a-gy{transform-box:fill-box;transform-origin:50% 100%;animation:gy .8s ease-out both}
+@keyframes gy{from{transform:scaleY(0)}}
+.sv .a-pop{transform-box:fill-box;transform-origin:50% 50%;animation:pop .55s cubic-bezier(.3,1.4,.5,1) both}
+@keyframes pop{from{transform:scale(.4);opacity:0}}
+.sv .a-fade{animation:fade .6s ease both}
+@keyframes fade{from{opacity:0}}
+.sv .a-up{animation:up .6s ease both}
+@keyframes up{from{opacity:0;transform:translateY(14px)}}
+.sv .a-jig{animation:jig 1.5s ease-in-out infinite alternate}
+@keyframes jig{from{transform:translate(-4px,3px)}to{transform:translate(4px,-3px)}}
+@keyframes shake{20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+
+/* 가로 TV(스탠바이미 가로) */
+@media (orientation:landscape) and (min-width:960px) and (min-height:560px){
+  html,body{height:100%;overflow:hidden}
+  .app{height:100%}
+  .main{grid-template-columns:minmax(19rem,29%) minmax(0,1fr);grid-template-areas:"pad viz"}
+  .pad{grid-template-rows:auto minmax(0,1fr) auto auto;align-content:stretch;min-height:0}
+  .viz{grid-template-rows:auto auto minmax(0,1fr) auto auto;min-height:0}
+  .stage svg{position:absolute;top:0;left:0;width:100%;height:100%}
+  .steps.n6{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .steps.n4{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+/* 세로 TV(스탠바이미 세로) */
+@media (orientation:portrait) and (min-width:720px) and (min-height:1100px){
+  html{font-size:clamp(13px,1.95vmin,32px)}
+  html,body{height:100%;overflow:hidden}
+  /* 세로: 그림 무대가 폭을 다 쓰도록 머리줄 · 단계 카드 · 숫자 패드를 줄임 (주소창이 있어도 그림이 제 크기) */
+  .head{grid-template-columns:auto auto;justify-content:space-between}
+  .mark,.sub{display:none}
+  h1{font-size:2rem}
+  .app{height:100%}
+  .main{grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"viz" "pad"}
+  .pad{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);grid-template-areas:"head info" "keys info" "actions info"}
+  #cVal{font-size:2.8rem}
+  .keys{grid-auto-rows:minmax(2.7rem,1fr)}
+  .btn{min-height:2.8rem}
+  .viz{grid-template-rows:auto auto minmax(0,1fr) auto auto;min-height:0}
+  .stage svg{position:absolute;top:0;left:0;width:100%;height:100%}
+  .steps.n6{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .steps.n4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .step .f,.step .s,.step .v small{display:none}
+  .step .v{font-size:1.05rem;white-space:nowrap}
+}
+/* 좁은 화면 */
+@media (max-width:760px){
+  .head{grid-template-columns:minmax(0,1fr)}
+  .head-r{grid-auto-flow:row;grid-template-columns:auto auto;justify-content:start}
+  .goal{grid-column:1 / -1;justify-self:start}
+  h1{font-size:1.8rem}
+  .viz-top{grid-template-columns:minmax(0,1fr)}
+  .tabs{grid-auto-flow:row}
+  .caption{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="head">
+    <div class="brand">
+      <div class="mark" aria-hidden="true"><b>6.02</b><span>×10<sup>23</sup></span></div>
+      <div>
+        <h1>내 숨은 몇 몰?</h1>
+        <p class="sub">풍선 둘레 하나로 숨 속 기체의 몰수를 구해요 · 가을 몰(Mole) DAY</p>
+      </div>
+    </div>
+    <div class="head-r">
+      <div class="goal">목표 <b class="gm">0.1 mol</b> = 둘레 <b class="gc" id="goalC">52.5</b> cm</div>
+      <div class="temp" role="group" aria-label="기준 온도">
+        <span>기준</span>
+        <button type="button" id="t25" aria-pressed="true">25 °C</button>
+        <button type="button" id="t0" aria-pressed="false">0 °C</button>
+      </div>
+      <button type="button" class="icon-btn" id="fsBtn" aria-label="전체 화면" title="전체 화면"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="panel pad" aria-label="풍선 둘레 입력">
+      <div class="pad-head">
+        <div class="lbl" id="cLbl">내 풍선 둘레</div>
+        <div class="readout" id="readout" role="status" aria-labelledby="cLbl"><span id="cVal" class="ph">--.-</span><span class="unit">cm</span></div>
+        <p class="msg" id="msg">가장 굵은 곳을 줄자로 재서 입력해요</p>
+      </div>
+      <div class="keys" id="keys">
+        <button type="button" class="key" data-k="7">7</button>
+        <button type="button" class="key" data-k="8">8</button>
+        <button type="button" class="key" data-k="9">9</button>
+        <button type="button" class="key" data-k="4">4</button>
+        <button type="button" class="key" data-k="5">5</button>
+        <button type="button" class="key" data-k="6">6</button>
+        <button type="button" class="key" data-k="1">1</button>
+        <button type="button" class="key" data-k="2">2</button>
+        <button type="button" class="key" data-k="3">3</button>
+        <button type="button" class="key" data-k=".">.</button>
+        <button type="button" class="key" data-k="0">0</button>
+        <button type="button" class="key fn" data-k="del" aria-label="한 글자 지우기">← 지움</button>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" id="clrBtn">다시 입력</button>
+        <button type="button" class="btn primary" id="calcBtn">계산하기</button>
+      </div>
+      <div class="info" id="info" aria-live="polite"></div>
+    </section>
+
+    <section class="panel viz" id="viz" aria-label="계산 과정">
+      <div class="viz-top">
+        <div class="tabs" role="tablist" aria-label="계산 방향">
+          <button type="button" class="tab" role="tab" id="tabGoal" aria-selected="true">0.1 mol 풍선은 몇 cm?</button>
+          <button type="button" class="tab" role="tab" id="tabMine" aria-selected="false">내 풍선은 몇 mol?</button>
+        </div>
+        <div class="ctrl">
+          <button type="button" class="cbtn" id="prevBtn" aria-label="이전 단계"><svg viewBox="0 0 24 24"><path d="M16 4 6 12l10 8z"/></svg>이전</button>
+          <button type="button" class="cbtn play" id="playBtn"></button>
+          <button type="button" class="cbtn" id="nextBtn" aria-label="다음 단계">다음<svg viewBox="0 0 24 24"><path d="m8 4 10 8-10 8z"/></svg></button>
+          <button type="button" class="cbtn" id="replayBtn" aria-label="처음부터 다시"><svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 1-7.6 5.5l2.3.8A5.6 5.6 0 1 0 12 6.4V9L7.5 5.2 12 1.5z"/></svg>처음부터</button>
+        </div>
+      </div>
+      <div class="caption">
+        <div class="cap-k" id="capK"></div>
+        <p class="cap-t" id="capT" aria-live="polite"></p>
+      </div>
+      <div class="stage"><svg class="sv" id="stage" viewBox="0 0 1000 520" preserveAspectRatio="xMidYMid meet" role="img" aria-label="계산 과정 그림"></svg></div>
+      <ol class="steps" id="steps"></ol>
+      <p class="foot">가정: 풍선은 공(구) 모양 · 풍선 속 압력 ≈ 1 atm · 화면의 숫자는 반올림한 값이에요.</p>
+    </section>
+  </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var AVO = 6.02e23;
+  var COND = {
+    '25': { Vm: 24.5, label: '25 °C, 1 atm' },
+    '0': { Vm: 22.4, label: '0 °C, 1 atm' }
+  };
+  var IDLE_MS = 180000;          // 내 풍선 화면에서 3분 동안 손대지 않으면 목표 화면으로
+  var PLAY_ICON = '<svg viewBox="0 0 24 24"><path d="m7 4 13 8-13 8z"/></svg>';
+  var PAUSE_ICON = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+
+  var st = { temp: '25', mode: 'goal', step: 0, playing: true, input: '', fresh: false, C: null };
+  var timer = null, idleTimer = null;
+
+  function $(id) { return document.getElementById(id); }
+  var stage = $('stage'), stepsEl = $('steps'), capK = $('capK'), capT = $('capT');
+  var cVal = $('cVal'), readout = $('readout'), msg = $('msg'), info = $('info'), playBtn = $('playBtn');
+
+  /* ---------- 숫자 ---------- */
+  function rnd(x, d) { var p = Math.pow(10, d); return Math.round(x * p) / p; }
+  function fx(x, d) { return Number(x).toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+  function n1(x) { return Math.round(x * 10) / 10; }
+  function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+  function sci(x) {
+    if (!(x > 0)) return { m: 0, e: 0 };
+    var e = Math.floor(Math.log10(x)), m = rnd(x / Math.pow(10, e), 1);
+    if (m >= 10) { m = rnd(m / 10, 1); e += 1; }
+    return { m: m, e: e };
+  }
+  function sciH(x) { var s = sci(x); return s.m.toFixed(1) + '×10<sup>' + s.e + '</sup>'; }
+  function frac(n, d) { return '<span class="fr"><span>' + n + '</span><span>' + d + '</span></span>'; }
+  function supS(e, tail) { return '<tspan dy="-0.6em" font-size="60%">' + e + '</tspan><tspan dy="0.36em">' + (tail || '') + '</tspan>'; }
+  function sciS(x, tail) { var s = sci(x); return s.m.toFixed(1) + ' × 10' + supS(s.e, tail); }
+  function signed(x, d) {
+    var v = rnd(x, d);
+    if (v === 0) return fx(0, d);
+    return (v > 0 ? '+' : '−') + fx(Math.abs(v), d);
+  }
+  function korApprox(x) {
+    function p2(v) { return Number(v.toPrecision(2)).toLocaleString('ko-KR'); }
+    if (x >= 1e8) return p2(x / 1e8) + '억';
+    if (x >= 1e4) return p2(x / 1e4) + '만';
+    return p2(x);
+  }
+  function longDigits(x) {
+    var s = sci(x);
+    if (s.e < 1) return fx(x, 0);
+    var str = String(Math.round(s.m * 10)) + new Array(s.e).join('0');
+    return str.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
+  /* ---------- 계산 모형 ---------- */
+  function cond() { return COND[st.temp]; }
+
+  // 둘레 → 몰수. 정확한 값은 그림 크기·비교에, d(반올림 사슬)는 화면 숫자에 쓴다
+  function mine(C) {
+    var Vm = cond().Vm;
+    var r = C / (2 * Math.PI), V = 4 / 3 * Math.PI * r * r * r, n = V / 1000 / Vm;
+    var d = {};
+    d.r = rnd(r, 2);
+    d.V = Math.round(4 / 3 * Math.PI * Math.pow(d.r, 3));
+    d.VL = rnd(d.V / 1000, 2);
+    d.n = rnd(d.VL / Vm, 3);
+    return { C: C, r: r, V: V, VL: V / 1000, n: n, d: d };
+  }
+
+  // 0.1 mol → 목표 둘레
+  function goal() {
+    var Vm = cond().Vm, VL = 0.1 * Vm, V = VL * 1000, r3 = 3 * V / (4 * Math.PI), r = Math.cbrt(r3);
+    var d = {};
+    d.VL = rnd(VL, 2);
+    d.V = Math.round(V);
+    d.r3 = rnd(r3, 1);
+    d.r = rnd(Math.cbrt(d.r3), 2);
+    d.C = rnd(2 * Math.PI * d.r, 1);
+    return { C: 2 * Math.PI * r, r: r, V: V, VL: VL, n: 0.1, d: d };
+  }
+
+  function tier(err, n) {
+    var a = Math.abs(err);
+    if (a <= 1) return { cls: 'good', svg: 't-good', t: '완벽해요!' };
+    if (a <= 3) return { cls: 'good', svg: 't-good', t: '아주 가까워요!' };
+    if (a <= 10) return { cls: 'ok', svg: 't-tape', t: '가까워요' };
+    if (a <= 30) return { cls: 'warn', svg: 't-warn', t: n < 0.1 ? '조금 모자라요' : '조금 넘쳤어요' };
+    return { cls: 'warn', svg: 't-warn', t: n < 0.1 ? '많이 모자라요' : '많이 넘쳤어요' };
+  }
+
+  /* ---------- SVG 조각 ---------- */
+  var DEFS = '<defs><radialGradient id="gBal" cx="36%" cy="30%" r="78%">' +
+    '<stop offset="0" class="s1"/><stop offset=".55" class="s2"/><stop offset="1" class="s3"/></radialGradient></defs>';
+
+  function tx(x, y, s, cls, attrs) {
+    return '<text x="' + n1(x) + '" y="' + n1(y) + '"' + (cls ? ' class="' + cls + '"' : '') + (attrs ? ' ' + attrs : '') + '>' + s + '</text>';
+  }
+  function dl(sec) { return 'style="animation-delay:' + sec + 's"'; }
+
+  function balloon(cx, cy, R, o) {
+    o = o || {};
+    var ky = cy + R, h = '';
+    if (!o.noString) h += '<path class="string" d="M' + n1(cx) + ' ' + n1(ky + 14) + ' c -9 14 9 24 0 36"/>';
+    h += '<path class="knot" d="M' + n1(cx - 10) + ' ' + n1(ky + 15) + ' L' + n1(cx + 10) + ' ' + n1(ky + 15) + ' L' + n1(cx) + ' ' + n1(ky - 4) + ' Z"/>';
+    h += '<circle cx="' + n1(cx) + '" cy="' + n1(cy) + '" r="' + n1(R) + '" fill="url(#gBal)"/>';
+    var hx = cx - R * 0.36, hy = cy - R * 0.42;
+    h += '<ellipse class="bl-hi" cx="' + n1(hx) + '" cy="' + n1(hy) + '" rx="' + n1(R * 0.15) + '" ry="' + n1(R * 0.26) + '" transform="rotate(-35 ' + n1(hx) + ' ' + n1(hy) + ')"/>';
+    return '<g' + (o.cls ? ' class="' + o.cls + '"' : '') + (o.delay != null ? ' ' + dl(o.delay) : '') + '>' + h + '</g>';
+  }
+  function ghost(cx, cy, R, cls) {
+    var ky = cy + R;
+    return '<g class="' + (cls || '') + '"><circle class="ghost" cx="' + n1(cx) + '" cy="' + n1(cy) + '" r="' + n1(R) + '"/>' +
+      '<path class="ghost-knot" d="M' + n1(cx - 9) + ' ' + n1(ky + 14) + ' L' + n1(cx + 9) + ' ' + n1(ky + 14) + ' L' + n1(cx) + ' ' + n1(ky - 2) + ' Z"/></g>';
+  }
+
+  // 줄자: 1 cm 당 s px, 최대 길이 840 px
+  function rulerG(C) { var s = Math.min(16, 840 / C); return { x0: 100, y: 430, h: 40, s: s, W: C * s }; }
+  function tapeCase(g) {
+    return '<g class="a-fade"><rect class="tape-case" x="' + (g.x0 - 64) + '" y="' + (g.y - 14) + '" width="66" height="' + (g.h + 28) + '" rx="14"/>' +
+      '<circle class="tape-hole" cx="' + (g.x0 - 31) + '" cy="' + (g.y + g.h / 2) + '" r="10"/></g>';
+  }
+  function ticks(g, C) {
+    var h = '';
+    for (var cm = 0; cm <= Math.floor(C + 1e-9); cm++) {
+      var big = cm % 10 === 0, mid = cm % 5 === 0;
+      if (!mid && g.s < 7) continue;
+      var x = g.x0 + cm * g.s, len = big ? 19 : (mid ? 13 : 7);
+      h += '<line class="tick" x1="' + n1(x) + '" y1="' + g.y + '" x2="' + n1(x) + '" y2="' + (g.y + len) + '"/>';
+      if (big && cm > 0 && cm < C - 2) h += tx(x + 4, g.y + g.h - 6, cm, 'num t-ink', 'font-size="15"');
+    }
+    return h;
+  }
+  function endLabel(g, txt, delay) {
+    var xe = n1(g.x0 + g.W);
+    var h = '<line class="endmark a-fade" ' + dl(delay) + ' x1="' + xe + '" y1="' + (g.y - 30) + '" x2="' + xe + '" y2="' + (g.y + g.h + 8) + '"/>';
+    if (g.W > 420) h += tx(xe, g.y - 40, txt, 'num t-tape a-up', 'font-size="30" font-weight="600" text-anchor="end" ' + dl(delay));
+    else h += tx(xe + 14, g.y + g.h / 2 + 10, txt, 'num t-tape a-up', 'font-size="30" font-weight="600" ' + dl(delay));
+    return h;
+  }
+
+  // 구하는 식 카드: 식 → 대입 → 답을 한 줄씩 크게. 분수를 위아래로 쓰려고 HTML(foreignObject)로 그리고,
+  // 줄이 카드보다 길면 fitStage()가 글자를 줄여 맞춤
+  function formulaCard(x, y, w, h, lines, delays, hint) {
+    var out = '<foreignObject x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '"><div class="fc">';
+    out += '<div class="fc-k">구하는 식</div>';
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i];
+      out += '<div class="fc-l a-up' + (l.cls ? ' ' + l.cls : '') + '" style="font-size:' + l.size + 'px;font-weight:' + (l.w || 600) + ';animation-delay:' + delays[i] + 's">' + l.t + '</div>';
+    }
+    if (hint) out += '<div class="fc-h a-fade" style="animation-delay:' + delays[delays.length - 1] + 's">' + hint + '</div>';
+    return out + '</div></foreignObject>';
+  }
+  // 한 줄짜리 HTML 식(분수 포함)
+  function foLine(x, y, w, h, html, size, delay) {
+    return '<foreignObject x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '"><div class="fo-line a-up" style="font-size:' + size + 'px;animation-delay:' + delay + 's">' + html + '</div></foreignObject>';
+  }
+  function fitStage() {
+    var els = stage.querySelectorAll('.fc-l, .fc-h, .fo-line');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i], fs = parseFloat(window.getComputedStyle(el).fontSize), guard = 0;
+      while (el.scrollWidth > el.clientWidth + 1 && fs > 14 && guard++ < 40) { fs *= 0.94; el.style.fontSize = fs.toFixed(1) + 'px'; }
+    }
+  }
+
+  /* ---------- 장면 ---------- */
+  // ① 둘레 재기: 풍선 가장 굵은 곳에 줄자를 감고, 펴서 길이를 읽는다
+  function sceneTape(m) {
+    var g = rulerG(m.C), cx = 520, cy = 196, R = clamp(m.r * 18, 48, 156), ry = R * 0.2;
+    var h = balloon(cx, cy, R, { cls: 'a-pop' });
+    h += '<path class="eq-back a-fade" ' + dl(0.5) + ' d="M' + n1(cx - R) + ' ' + cy + ' A ' + n1(R) + ' ' + n1(ry) + ' 0 0 1 ' + n1(cx + R) + ' ' + cy + '"/>';
+    h += '<path class="eq-front a-draw" pathLength="1" ' + dl(0.6) + ' d="M' + n1(cx - R) + ' ' + cy + ' A ' + n1(R) + ' ' + n1(ry) + ' 0 0 0 ' + n1(cx + R) + ' ' + cy + '"/>';
+    h += '<path class="lead a-fade" ' + dl(1.3) + ' d="M' + n1(cx + R + 10) + ' ' + cy + ' H' + n1(cx + R + 44) + '"/>';
+    h += tx(cx + R + 52, cy + 7, '가장 굵은 곳을 한 바퀴', 'a-fade', 'font-size="21" ' + dl(1.3));
+    h += tx(g.x0, g.y - 16, '줄자를 쭉 펴면', 't-muted a-fade', 'font-size="19" ' + dl(1.6));
+    h += tapeCase(g);
+    h += '<g class="a-gx" ' + dl(1.6) + '><rect class="tape" x="' + g.x0 + '" y="' + g.y + '" width="' + n1(g.W) + '" height="' + g.h + '" rx="3"/>' + ticks(g, m.C) + '</g>';
+    h += endLabel(g, 'C = ' + fx(m.C, 1) + ' cm', 2.5);
+    return h;
+  }
+
+  // ② 반지름(목표 화면에서는 ④ 둘레): 펼친 줄자 안에 반지름이 2π개
+  function sceneRadius(m, mode) {
+    var g = rulerG(m.C), cx = 715, cy = 190, R = clamp(m.r * 18, 48, 150), ry = R * 0.2;
+    var isGoal = mode === 'goal';
+    var tR = isGoal ? 0.2 : 2.2, tSeg = isGoal ? 1.0 : 0.3, tC = isGoal ? 2.6 : 0.1;
+    var h = formulaCard(30, 22, 440, 384, isGoal
+      ? [{ t: 'C = 2π × r', size: 54 }, { t: '= 6.28… × ' + fx(m.d.r, 2), size: 38, w: 500 }, { t: '= ' + fx(m.d.C, 1) + ' cm', size: 54, cls: 'c-tape' }]
+      : [{ t: 'r = ' + frac('C', '2π'), size: 56 }, { t: '= ' + frac(fx(m.C, 1), '6.28…'), size: 40, w: 500 }, { t: '= ' + fx(m.d.r, 2) + ' cm', size: 54, cls: 'c-gas' }],
+      isGoal ? [0.3, 1.2, 2.6] : [0.4, 1.1, 2.0], '2π ≈ 6.28 (π ≈ 3.14)');
+    h += balloon(cx, cy, R, { cls: 'a-fade' });
+    h += '<path class="eq-front dim" d="M' + n1(cx - R) + ' ' + cy + ' A ' + n1(R) + ' ' + n1(ry) + ' 0 0 0 ' + n1(cx + R) + ' ' + cy + '"/>';
+    h += '<path class="rad a-draw" pathLength="1" ' + dl(tR) + ' d="M' + cx + ' ' + cy + ' H' + n1(cx + R) + '"/>';
+    h += '<circle class="ctr a-fade" ' + dl(tR) + ' cx="' + cx + '" cy="' + cy + '" r="6"/>';
+    h += tx(cx + R / 2, cy - 16, 'r = ' + fx(m.d.r, 2) + ' cm', 'num t-gas halo a-up', 'font-size="28" font-weight="600" text-anchor="middle" ' + dl(tR + 0.5));
+    h += tapeCase(g);
+    h += '<rect class="tape" x="' + g.x0 + '" y="' + g.y + '" width="' + n1(g.W) + '" height="' + g.h + '" rx="3"/>';
+    var w = m.r * g.s;
+    for (var i = 0; i < 7; i++) {
+      var x = g.x0 + i * w, wi = Math.min(w, g.W - i * w);
+      if (wi < 0.5) break;
+      var full = wi >= w - 0.01;
+      var cls = i === 0 ? 'seg-r' : (i % 2 ? 'seg-b' : 'seg-a');
+      h += '<g class="a-pop" ' + dl(tSeg + i * 0.18) + '><rect class="' + cls + '" x="' + n1(x + 1) + '" y="' + g.y + '" width="' + n1(Math.max(wi - 2, 1)) + '" height="' + g.h + '" rx="3"/>';
+      if (wi > 30) h += tx(x + wi / 2, g.y + g.h / 2 + (full ? 8 : 5), full ? 'r' : fx(wi / w, 2), 'num t-ink', 'font-size="' + (full ? 23 : 14) + '" font-weight="600" text-anchor="middle"');
+      h += '</g>';
+    }
+    h += tx(g.x0, g.y + g.h + 36, '둘레 안에 반지름(r)이 2π ≈ 6.28개', 'a-fade', 'font-size="21" ' + dl(tSeg + 1.3));
+    h += endLabel(g, 'C = ' + fx(isGoal ? m.d.C : m.C, 1) + ' cm', tC);
+    return h;
+  }
+
+  // ③ 부피(목표 화면에서는 ②): 왼쪽 구하는 식, 오른쪽 1 L 상자
+  function sceneVolume(m, mode) {
+    var c = cond(), dV = m.d.V, dVL = m.d.VL, isGoal = mode === 'goal';
+    var h = formulaCard(30, 22, 450, 384, isGoal
+      ? [{ t: 'V = n × ' + c.Vm + ' L/mol', size: 46 }, { t: '= 0.1 × ' + c.Vm, size: 38, w: 500 }, { t: '= ' + fx(dVL, 2) + ' L', size: 54, cls: 'c-gas' }]
+      : [{ t: 'V = ' + frac('4', '3') + ' × π × r³', size: 52 }, { t: '= ' + frac('4', '3') + ' × π × ' + fx(m.d.r, 2) + '³', size: 40, w: 500 }, { t: '= ' + fx(dV, 0) + ' cm³', size: 54, cls: 'c-gas' }],
+      [0.2, 0.9, 1.6], isGoal ? '기체 1 mol = ' + c.Vm + ' L (' + c.label + ')' : 'r³ = r × r × r · π ≈ 3.14');
+    var conv = isGoal
+      ? fx(dVL, 2) + ' L × 1000 = <tspan class="t-gas">' + fx(dV, 0) + ' cm³</tspan>'
+      : fx(dV, 0) + ' cm³ ÷ 1000 = <tspan class="t-gas">' + fx(dVL, 2) + ' L</tspan>';
+    h += tx(58, 456, conv, 'num a-up', 'font-size="28" font-weight="600" ' + dl(2.2));
+    h += tx(58, 494, '1000 cm³ = 1 L', 't-muted a-fade', 'font-size="18" ' + dl(2.2));
+    h += tx(530, 62, '1 L 상자 = 10 cm × 10 cm × 10 cm', 't-muted', 'font-size="19"');
+    var full = Math.floor(dVL + 1e-9), part = rnd(dVL - full, 2);
+    var count = Math.max(1, full + (part > 0 ? 1 : 0)), shown = Math.min(count, 36);
+    var AW = 430, AH = 400, gap = 14, bx0 = 530;
+    var cols = Math.max(1, Math.ceil(Math.sqrt(shown * AW / AH))), rows = Math.ceil(shown / cols);
+    var s = Math.min(120, (AW - (cols - 1) * gap) / cols, (AH - (rows - 1) * gap) / rows);
+    var by0 = 90 + (AH - (rows * s + (rows - 1) * gap)) / 2;
+    for (var i = 0; i < shown; i++) {
+      var x = bx0 + (i % cols) * (s + gap), y = by0 + Math.floor(i / cols) * (s + gap);
+      var f = i < full ? 1 : part, fh = (s - 6) * f, t0 = 0.6 + i * 0.12;
+      h += '<g class="a-pop" ' + dl(t0) + '><rect class="box" x="' + n1(x) + '" y="' + n1(y) + '" width="' + n1(s) + '" height="' + n1(s) + '" rx="6"/></g>';
+      if (fh > 0) h += '<rect class="box-fill a-gy" ' + dl(t0 + 0.2) + ' x="' + n1(x + 3) + '" y="' + n1(y + 3 + (s - 6 - fh)) + '" width="' + n1(s - 6) + '" height="' + n1(fh) + '" rx="3"/>';
+      if (s >= 46) h += tx(x + s / 2, y + s / 2 + s * 0.09, f === 1 ? '1 L' : fx(f, 2) + ' L', 'num halo a-fade', 'font-size="' + Math.round(Math.min(24, s * 0.24)) + '" font-weight="600" text-anchor="middle" ' + dl(t0 + 0.3));
+    }
+    if (count > shown) h += tx(bx0, 508, '상자 ' + count + '개 중 ' + shown + '개만 그렸어요', 't-muted', 'font-size="17"');
+    return h;
+  }
+
+  // ④ 몰수(목표 화면에서는 ①): 기체 1 mol 상자 = 0.1 mol 칸 10개
+  function sceneMol(m, mode) {
+    var c = cond(), x0 = 80, y = 122, W = 840, H = 150, sw = W / 10, i;
+    var h = tx(x0, 64, '기체 1 mol 상자 = ' + c.Vm + ' L', '', 'font-size="27" font-weight="700"');
+    h += tx(x0 + W, 64, c.label, 't-muted num', 'font-size="21" text-anchor="end"');
+    var units = Math.min(10, m.n / 0.1), fw = units * sw;
+    h += '<rect class="gas-fill a-gx" ' + dl(0.4) + ' x="' + x0 + '" y="' + y + '" width="' + n1(Math.max(fw, 1)) + '" height="' + H + '" rx="12"/>';
+    for (i = 1; i < 10; i++) h += '<line class="slot" x1="' + n1(x0 + i * sw) + '" y1="' + (y + 10) + '" x2="' + n1(x0 + i * sw) + '" y2="' + (y + H - 10) + '"/>';
+    for (i = 0; i < 10; i++) {
+      var bx = x0 + sw * (i + 0.5), by = y + H / 2 - 10, br = sw * 0.28;
+      h += '<circle class="mini" cx="' + n1(bx) + '" cy="' + n1(by) + '" r="' + n1(br) + '"/>';
+      h += '<path class="mini" d="M' + n1(bx - 6) + ' ' + n1(by + br + 9) + ' L' + n1(bx + 6) + ' ' + n1(by + br + 9) + ' L' + n1(bx) + ' ' + n1(by + br - 2) + ' Z"/>';
+    }
+    h += '<rect class="cont" x="' + x0 + '" y="' + y + '" width="' + W + '" height="' + H + '" rx="12"/>';
+    h += '<path class="brk a-fade" ' + dl(1.0) + ' d="M' + (x0 + 4) + ' ' + (y - 8) + ' v-10 H' + n1(x0 + sw - 4) + ' v10"/>';
+    h += tx(x0 + sw + 12, y - 10, '한 칸 = 0.1 mol = ' + fx(c.Vm / 10, 2) + ' L', 't-tape a-fade', 'font-size="20" ' + dl(1.0));
+    h += tx(x0, y + H + 32, '0', 'num t-muted', 'font-size="19" text-anchor="middle"');
+    h += tx(x0 + W / 2, y + H + 32, '0.5', 'num t-muted', 'font-size="19" text-anchor="middle"');
+    h += tx(x0 + W, y + H + 32, '1 mol', 'num t-muted', 'font-size="19" text-anchor="end"');
+    if (mode === 'goal') {
+      h += tx(x0, 380, '0.1 mol = 1 mol 상자의 <tspan class="t-gas">10분의 1</tspan>', 'a-up', 'font-size="34" font-weight="700" ' + dl(1.4));
+      h += tx(x0, 432, '0.1 mol 속 기체 분자 = <tspan class="num">6.02 × 10' + supS(22, ' 개') + '</tspan>', 't-muted a-fade', 'font-size="23" ' + dl(2.0));
+    } else {
+      var mx = x0 + fw;
+      h += '<path class="mk a-pop" ' + dl(1.3) + ' d="M' + n1(mx) + ' ' + (y + H + 4) + ' l -11 20 h 22 z"/>';
+      h += foLine(x0, 318, W, 100, 'n&nbsp;=&nbsp;' + frac(fx(m.d.VL, 2) + ' L', c.Vm + ' L/mol') + '&nbsp;=&nbsp;<span class="c-gas">' + fx(m.d.n, 3) + ' mol</span>', 40, 1.5);
+      var line2 = m.n >= 1 ? '내 풍선 하나로 1 mol 상자를 다 채우고도 남아요' : '1 mol을 채우려면 내 풍선이 약 ' + fx(1 / m.n, 1) + '개 필요해요';
+      h += tx(x0, 448, line2, 't-muted a-fade', 'font-size="23" ' + dl(2.1));
+    }
+    return h;
+  }
+
+  // ⑤ 분자 수
+  function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function sceneParticles(m) {
+    var cx = 240, cy = 222, R = clamp(m.r * 16, 60, 165), N = m.d.n * AVO;
+    var h = balloon(cx, cy, R, {});
+    var rand = rng(7), groups = ['', '', ''];
+    for (var i = 0; i < 72; i++) {
+      var a = rand() * Math.PI * 2, rr = Math.sqrt(rand()) * R * 0.84;
+      groups[i % 3] += '<circle class="dot" cx="' + n1(cx + Math.cos(a) * rr) + '" cy="' + n1(cy + Math.sin(a) * rr) + '" r="4.5"/>';
+    }
+    h += '<g class="a-jig" style="animation-duration:1.3s">' + groups[0] + '</g>';
+    h += '<g class="a-jig" style="animation-duration:1.7s;animation-delay:-.6s">' + groups[1] + '</g>';
+    h += '<g class="a-jig" style="animation-duration:2.1s;animation-delay:-1.1s">' + groups[2] + '</g>';
+    h += tx(cx, 500, '점 = 분자 모형 (실제는 훨씬 많아요)', 't-muted', 'font-size="17" text-anchor="middle"');
+    var x = 500, digits = longDigits(N) + ' 개', fs = Math.min(26, 460 / (digits.length * 0.62));
+    var years = N / 31557600, ratio = years / 1.38e10;
+    h += tx(x, 104, '내 숨 속 기체 분자 수', 't-muted', 'font-size="22"');
+    h += tx(x, 172, sciS(N, ' 개'), 'num t-gas a-up', 'font-size="56" font-weight="600" ' + dl(0.2));
+    h += tx(x, 228, digits, 'num a-fade', 'font-size="' + n1(fs) + '" ' + dl(0.7));
+    h += tx(x, 312, '1초에 1개씩 센다면', 't-muted a-fade', 'font-size="22" ' + dl(1.3));
+    h += tx(x, 364, '약 ' + sciS(years, ' 년'), 'num a-up', 'font-size="38" font-weight="600" ' + dl(1.5));
+    h += tx(x, 418, '우주 나이(138억 년)의 약 ' + korApprox(ratio) + ' 배', 'a-fade', 'font-size="22" ' + dl(2.0));
+    return h;
+  }
+
+  // ⑥ 0.1 mol과 비교
+  function sceneCompare(m, g, err, ti) {
+    var k = Math.min(18, 112 / Math.max(m.r, g.r)), Rt = g.r * k, Rm = m.r * k, cy = 166;
+    var dC = m.C - g.C;
+    var h = ghost(175, cy, Rt, 'a-fade');
+    h += tx(175, 330, '목표 0.1 mol', 't-gas', 'font-size="21" font-weight="700" text-anchor="middle"');
+    h += tx(175, 357, fx(g.d.C, 1) + ' cm', 'num t-muted', 'font-size="21" text-anchor="middle"');
+    h += balloon(440, cy, Rm, { cls: 'a-pop', noString: true, delay: 0.3 });
+    h += tx(440, 330, '내 풍선', 't-bal', 'font-size="21" font-weight="700" text-anchor="middle"');
+    h += tx(440, 357, fx(m.C, 1) + ' cm', 'num t-muted', 'font-size="21" text-anchor="middle"');
+    var x = 620;
+    h += tx(x, 110, ti.t, ti.svg + ' a-up', 'font-size="38" font-weight="700" ' + dl(0.6));
+    h += tx(x, 168, '둘레 차이 <tspan class="num">' + signed(dC, 1) + ' cm</tspan>', 'a-fade', 'font-size="25" ' + dl(1.0));
+    h += tx(x, 208, '몰수 차이 <tspan class="num">' + signed(err, 1) + ' %</tspan>', 'a-fade', 'font-size="25" ' + dl(1.2));
+    h += tx(x, 268, '둘레가 1 % 달라지면', 't-muted a-fade', 'font-size="19" ' + dl(1.6));
+    h += tx(x, 296, '몰수는 약 3 % 달라져요', 't-muted a-fade', 'font-size="19" ' + dl(1.6));
+    // 몰수 눈금
+    var ax0 = 80, ax1 = 920, ay = 440, maxMol = Math.max(0.2, Math.ceil(m.n * 1.15 / 0.05) * 0.05);
+    function X(v) { return ax0 + v / maxMol * (ax1 - ax0); }
+    h += '<rect class="band" x="' + n1(X(0.097)) + '" y="' + (ay - 14) + '" width="' + n1(Math.max(X(0.103) - X(0.097), 3)) + '" height="28"/>';
+    h += '<line class="axis" x1="' + ax0 + '" y1="' + ay + '" x2="' + ax1 + '" y2="' + ay + '"/>';
+    for (var v = 0; v <= maxMol + 1e-9; v += 0.05) h += '<line class="axis-t" x1="' + n1(X(v)) + '" y1="' + (ay - 7) + '" x2="' + n1(X(v)) + '" y2="' + (ay + 7) + '"/>';
+    h += '<line class="tline" x1="' + n1(X(0.1)) + '" y1="' + (ay - 30) + '" x2="' + n1(X(0.1)) + '" y2="' + (ay + 18) + '"/>';
+    h += tx(X(0.1), ay - 38, '목표 0.1 mol', 't-gas', 'font-size="19" text-anchor="middle"');
+    h += tx(ax0, ay + 36, '0', 'num t-muted', 'font-size="17" text-anchor="middle"');
+    h += tx(ax1, ay + 36, fx(maxMol, 2) + ' mol', 'num t-muted', 'font-size="17" text-anchor="end"');
+    var mx = X(m.n);
+    h += '<path class="mk a-pop" ' + dl(0.9) + ' d="M' + n1(mx) + ' ' + (ay + 10) + ' l -11 20 h 22 z"/>';
+    h += tx(clamp(mx, 150, 850), ay + 62, '내 풍선 ' + fx(m.d.n, 3) + ' mol', 'num t-bal a-fade', 'font-size="20" font-weight="600" text-anchor="middle" ' + dl(0.9));
+    return h;
+  }
+
+  // 목표 화면 ③: 세제곱근 찾기
+  function sceneCube(g) {
+    var d = g.d;
+    var h = formulaCard(30, 22, 450, 384,
+      [{ t: 'r³ = ' + frac('3V', '4π'), size: 56 }, { t: '= ' + frac('3 × ' + fx(d.V, 0), '4π'), size: 40, w: 500 }, { t: '= ' + fx(d.r3, 1), size: 54, cls: 'c-tape' }],
+      [0.2, 0.9, 1.6], 'V = ' + frac('4', '3') + ' × π × r³을 r³에 대해 풀어요');
+    h += tx(58, 462, 'r³ = r × r × r', 't-muted a-fade', 'font-size="22" ' + dl(1.6));
+    var x = 540, a = Math.floor(d.r), b = a + 1;
+    h += tx(x, 86, '세제곱한 값이 <tspan class="num t-tape">' + fx(d.r3, 1) + '</tspan>인 수는?', 'a-fade', 'font-size="25" font-weight="700" ' + dl(2.0));
+    var rows = [
+      [a + '³ = ' + fx(Math.pow(a, 3), 0), '작아요', 't-warn'],
+      [b + '³ = ' + fx(Math.pow(b, 3), 0), '커요', 't-warn'],
+      [fx(d.r, 2) + '³ = ' + fx(Math.pow(d.r, 3), 1), '거의 같아요!', 't-good']
+    ];
+    for (var i = 0; i < 3; i++) {
+      var y = 160 + i * 66;
+      h += tx(x, y, rows[i][0], 'num a-up', 'font-size="30" font-weight="600" ' + dl(2.4 + i * 0.6));
+      h += tx(830, y, rows[i][1], rows[i][2] + ' a-fade', 'font-size="22" font-weight="700" ' + dl(2.7 + i * 0.6));
+    }
+    h += tx(x, 392, 'r ≈ ' + fx(d.r, 2) + ' cm', 'num t-gas a-up', 'font-size="50" font-weight="600" ' + dl(4.3));
+    return h;
+  }
+
+  /* ---------- 단계 ---------- */
+  function stepsMine() {
+    var c = cond(), m = mine(st.C), g = goal(), d = m.d;
+    var dC = st.C - g.C, err = (m.n / 0.1 - 1) * 100, ti = tier(err, m.n);
+    var cmp = Math.abs(dC) < 0.05
+      ? '목표 둘레 ' + fx(g.d.C, 1) + ' cm와 거의 똑같아요! '
+      : '목표 둘레 ' + fx(g.d.C, 1) + ' cm보다 ' + fx(Math.abs(dC), 1) + ' cm ' + (dC < 0 ? '짧아요. ' : '길어요. ');
+    cmp += '부피는 둘레의 세제곱에 비례해서, 둘레가 1 % 달라지면 몰수는 약 3 % 달라져요.';
+    return [
+      { k: '둘레', f: '줄자로 잰 길이', s: '가장 굵은 곳', v: fx(st.C, 1) + ' cm', dur: 4.5,
+        cap: '풍선에서 가장 굵은 곳을 줄자로 한 바퀴 잰 길이가 둘레(C)예요.',
+        scene: function () { return sceneTape(m); } },
+      { k: '반지름', f: 'r = ' + frac('C', '2π'), s: '= ' + frac(fx(st.C, 1), '6.28…'), v: fx(d.r, 2) + ' cm', dur: 6,
+        cap: '둘레를 쭉 펴면 반지름(r)이 2π, 약 6.28개 들어가요. 그래서 둘레를 2π로 나누면 반지름이에요.',
+        scene: function () { return sceneRadius(m, 'mine'); } },
+      { k: '부피', f: 'V = ' + frac('4', '3') + ' × π × r³', s: '= ' + frac('4', '3') + ' × π × ' + fx(d.r, 2) + '³', v: fx(d.V, 0) + ' cm³<small>= ' + fx(d.VL, 2) + ' L</small>', dur: 6,
+        cap: '풍선을 공(구) 모양으로 보고 부피를 구해요. 1000 cm³가 1 L예요.',
+        scene: function () { return sceneVolume(m); } },
+      { k: '몰수', f: 'n = ' + frac('V', c.Vm + ' L/mol'), s: '= ' + frac(fx(d.VL, 2), c.Vm), v: fx(d.n, 3) + ' mol', dur: 6.5,
+        cap: c.label + '에서 기체 1 mol은 ' + c.Vm + ' L예요. 내 풍선 부피를 ' + c.Vm + ' L로 나누면 몰수가 나와요.',
+        scene: function () { return sceneMol(m, 'mine'); } },
+      { k: '분자 수', f: 'N = n × 6.02×10<sup>23</sup>', s: '= ' + fx(d.n, 3) + ' × 6.02×10<sup>23</sup>', v: sciH(d.n * AVO) + ' 개', dur: 7,
+        cap: '1 mol은 입자 6.02×10<sup>23</sup>개예요. 내 숨 속 기체 분자는 몇 개일까요?',
+        scene: function () { return sceneParticles(m); } },
+      { k: '0.1 mol과 비교', f: '목표 둘레 ' + fx(g.d.C, 1) + ' cm', s: '둘레 차이', v: signed(dC, 1) + ' cm', dur: 0,
+        cap: cmp,
+        scene: function () { return sceneCompare(m, g, err, ti); } }
+    ];
+  }
+
+  function stepsGoal() {
+    var c = cond(), g = goal(), d = g.d;
+    var capV = st.temp === '25'
+      ? '25 °C, 1 atm에서 기체 1 mol은 24.5 L예요. 0 °C의 22.4 L보다 큰 까닭은 기체가 데워지면 부피가 늘어나기 때문이에요(22.4 × 298 ÷ 273 ≈ 24.5).'
+      : '0 °C, 1 atm에서 기체 1 mol은 22.4 L예요. 0.1 mol은 그 10분의 1이에요.';
+    return [
+      { k: '목표 몰수', f: '기체 0.1 mol', s: '1 mol의 10분의 1', v: '0.1 mol', dur: 7,
+        cap: '목표는 기체 0.1 mol이에요. 기체 1 mol 상자를 10칸으로 나누면 딱 한 칸이에요.',
+        scene: function () { return sceneMol(g, 'goal'); } },
+      { k: '부피', f: 'V = n × ' + c.Vm + ' L/mol', s: '= 0.1 × ' + c.Vm, v: fx(d.VL, 2) + ' L<small>= ' + fx(d.V, 0) + ' cm³</small>', dur: 8,
+        cap: capV,
+        scene: function () { return sceneVolume(g, 'goal'); } },
+      { k: '반지름', f: 'r³ = ' + frac('3V', '4π'), s: '= ' + frac('3 × ' + fx(d.V, 0), '4π') + ' = ' + fx(d.r3, 1), v: 'r ≈ ' + fx(d.r, 2) + ' cm', dur: 8,
+        cap: '구의 부피 V = ' + frac('4', '3') + ' × π × r³를 거꾸로 풀면 r³ = ' + frac('3V', '4π') + '예요. 세제곱한 값이 ' + fx(d.r3, 1) + '인 수가 반지름이에요.',
+        scene: function () { return sceneCube(g); } },
+      { k: '둘레', f: 'C = 2π × r', s: '= 6.28… × ' + fx(d.r, 2), v: fx(d.C, 1) + ' cm', dur: 9,
+        cap: '둘레는 반지름의 2π배(약 6.28배)예요. 줄자로 쟀을 때 ' + fx(d.C, 1) + ' cm가 되게 불면 0.1 mol!',
+        scene: function () { return sceneRadius(g, 'goal'); } }
+    ];
+  }
+
+  function steps() { return st.mode === 'mine' ? stepsMine() : stepsGoal(); }
+
+  /* ---------- 그리기 ---------- */
+  function noTag(n) { return '<span class="no">' + n + '</span>'; }
+
+  function renderChrome(list) {
+    var s = list[st.step];
+    $('tabGoal').setAttribute('aria-selected', st.mode === 'goal' ? 'true' : 'false');
+    $('tabMine').setAttribute('aria-selected', st.mode === 'mine' ? 'true' : 'false');
+    capK.innerHTML = noTag(st.step + 1) + s.k;
+    capT.innerHTML = s.cap;
+    var last = st.step >= list.length - 1;
+    var runBar = st.playing && !(st.mode === 'mine' && last);
+    stepsEl.className = 'steps n' + list.length;
+    stepsEl.innerHTML = list.map(function (it, i) {
+      var cls = i < st.step ? 'done' : (i === st.step ? 'on' + (runBar ? ' run' : '') : 'up');
+      var known = i <= st.step;
+      return '<li><button type="button" class="step ' + cls + '" data-i="' + i + '">' +
+        '<span class="k">' + noTag(i + 1) + it.k + '</span>' +
+        '<span class="f">' + it.f + '</span>' +
+        '<span class="s">' + (known ? it.s : '&nbsp;') + '</span>' +
+        '<span class="v">' + (known ? it.v : '?') + '</span>' +
+        (i === st.step ? '<i class="bar" style="animation-duration:' + (s.dur || 1) + 's"></i>' : '') +
+        '</button></li>';
+    }).join('');
+    playBtn.innerHTML = st.playing ? PAUSE_ICON + '멈춤' : PLAY_ICON + '자동';
+    playBtn.setAttribute('aria-label', st.playing ? '자동 넘김 멈춤' : '자동 넘김 시작');
+    renderInfo();
+  }
+
+  function renderStage(list) {
+    var s = list[st.step];
+    stage.innerHTML = DEFS + s.scene();
+    stage.setAttribute('aria-label', (st.step + 1) + '단계 ' + s.k + ' 그림');
+    fitStage();
+  }
+
+  function renderAll() {
+    var list = steps();
+    if (st.step > list.length - 1) st.step = 0;
+    $('goalC').textContent = fx(goal().d.C, 1);
+    renderChrome(list);
+    renderStage(list);
+    schedule(list);
+  }
+
+  function renderInfo() {
+    var g = goal();
+    if (st.mode !== 'mine' || st.C == null) {
+      info.innerHTML = '<h2 class="info-h">이렇게 해요</h2>' +
+        '<ol class="how"><li>풍선을 불어서 입구를 묶어요</li><li>가장 굵은 곳의 둘레를 줄자로 재요</li><li>둘레(cm)를 누르고 <b>계산하기</b></li></ol>' +
+        '<p class="goal-line">0.1 mol 풍선의 둘레는 <b>' + fx(g.d.C, 1) + ' cm</b> (' + cond().label + ')</p>';
+      return;
+    }
+    var m = mine(st.C), k = st.step, d = m.d;
+    var err = (m.n / 0.1 - 1) * 100, ti = tier(err, m.n), dC = st.C - g.C;
+    function q(show, html) { return show ? html : '<span class="q">?</span>'; }
+    info.innerHTML = '<h2 class="info-h">내 풍선</h2>' +
+      '<dl class="res"><div><dt>둘레</dt><dd>' + fx(st.C, 1) + ' cm</dd></div>' +
+      '<div><dt>부피</dt><dd>' + q(k >= 2, fx(d.VL, 2) + ' L') + '</dd></div></dl>' +
+      '<div class="res-big"><span class="k">내 숨</span><b>' + q(k >= 3, fx(d.n, 3)) + '</b><span>mol</span></div>' +
+      '<p class="res-n">분자 <b>' + q(k >= 4, sciH(d.n * AVO) + ' 개') + '</b></p>' +
+      (k >= 5
+        ? '<p class="badge ' + ti.cls + '">' + ti.t + ' · 둘레 ' + signed(dC, 1) + ' cm</p>'
+        : '<p class="badge wait">0.1 mol과 얼마나 가까울까요?</p>');
+  }
+
+  /* ---------- 자동 넘김 ---------- */
+  function schedule(list) {
+    clearTimeout(timer);
+    if (!st.playing) return;
+    var s = list[st.step], last = st.step >= list.length - 1;
+    if (st.mode === 'mine' && last) { st.playing = false; renderChrome(list); return; }
+    timer = setTimeout(function () {
+      st.step = last ? 0 : st.step + 1;
+      renderAll();
+    }, s.dur * 1000);
+  }
+
+  function go(i) {
+    var list = steps();
+    st.step = clamp(i, 0, list.length - 1);
+    st.playing = false;
+    renderAll();
+  }
+
+  function togglePlay() {
+    var list = steps();
+    if (st.playing) {
+      st.playing = false;
+      clearTimeout(timer);
+      renderChrome(list);
+      return;
+    }
+    st.playing = true;
+    if (st.step >= list.length - 1) { st.step = 0; renderAll(); return; }
+    renderChrome(list);
+    schedule(list);
+  }
+
+  function showGoal() {
+    st.mode = 'goal'; st.step = 0; st.playing = true;
+    renderAll();
+  }
+
+  function showMine() {
+    if (st.C == null) { fail('먼저 둘레를 입력하고 계산하기를 눌러요'); return; }
+    st.mode = 'mine'; st.step = 0; st.playing = true;
+    renderAll();
+  }
+
+  /* ---------- 입력 ---------- */
+  function showInput() {
+    cVal.textContent = st.input || '--.-';
+    cVal.className = st.input ? '' : 'ph';
+    readout.classList.toggle('on', !!st.input);
+  }
+  function setMsg(t, err) { msg.textContent = t; msg.className = 'msg' + (err ? ' err' : ''); }
+  function fail(t) {
+    setMsg(t, true);
+    readout.classList.remove('err');
+    void readout.offsetWidth;
+    readout.classList.add('err');
+  }
+
+  function press(k) {
+    if (st.fresh) { st.input = ''; st.fresh = false; }
+    var s = st.input;
+    if (k === 'del') s = s.slice(0, -1);
+    else if (k === 'clr') s = '';
+    else if (k === '.') { if (s.indexOf('.') < 0) s = (s === '' ? '0' : s) + '.'; }
+    else {
+      var p = s.split('.');
+      if (p.length === 2) { if (p[1].length >= 1) { fail('소수 첫째 자리까지만 입력해요'); return; } }
+      else if (p[0].length >= 3) return;
+      if (s === '0') s = '';
+      s += k;
+    }
+    st.input = s;
+    showInput();
+    setMsg(s ? '다 눌렀으면 「계산하기」' : '가장 굵은 곳을 줄자로 재서 입력해요');
+  }
+
+  function calc() {
+    var v = parseFloat(st.input);
+    if (st.input === '' || isNaN(v)) { fail('둘레를 먼저 입력해 주세요'); return; }
+    if (v < 10 || v > 150) { fail('둘레는 10 ~ 150 cm 사이로 입력해 주세요'); return; }
+    st.C = v;
+    st.input = v.toFixed(1);
+    st.fresh = true;
+    showInput();
+    setMsg('계산 과정이 화면에 나와요 · 다음 사람은 숫자를 새로 눌러요');
+    st.mode = 'mine'; st.step = 0; st.playing = true;
+    renderAll();
+    var vz = $('viz');
+    if (document.documentElement.scrollHeight > window.innerHeight + 4 && vz.scrollIntoView) vz.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function setTemp(t) {
+    st.temp = t;
+    $('t25').setAttribute('aria-pressed', t === '25' ? 'true' : 'false');
+    $('t0').setAttribute('aria-pressed', t === '0' ? 'true' : 'false');
+    try { localStorage.setItem('breathMole.temp', t); } catch (e) { /* 저장 못 해도 화면은 그대로 */ }
+    renderAll();
+  }
+
+  /* ---------- 손대지 않을 때 ---------- */
+  function touch() {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(function () {
+      if (st.mode !== 'mine') return;
+      st.C = null; st.input = ''; st.fresh = false;
+      showInput();
+      setMsg('가장 굵은 곳을 줄자로 재서 입력해요');
+      showGoal();
+    }, IDLE_MS);
+  }
+
+  /* ---------- 연결 ---------- */
+  $('keys').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-k]');
+    if (b) press(b.getAttribute('data-k'));
+  });
+  $('clrBtn').addEventListener('click', function () { st.fresh = false; press('clr'); });
+  $('calcBtn').addEventListener('click', calc);
+  $('tabGoal').addEventListener('click', showGoal);
+  $('tabMine').addEventListener('click', showMine);
+  $('prevBtn').addEventListener('click', function () { go(st.step - 1); });
+  $('nextBtn').addEventListener('click', function () { go(st.step + 1); });
+  $('replayBtn').addEventListener('click', function () { st.step = 0; st.playing = true; renderAll(); });
+  playBtn.addEventListener('click', togglePlay);
+  stepsEl.addEventListener('click', function (e) {
+    var b = e.target.closest('.step');
+    if (b) go(parseInt(b.getAttribute('data-i'), 10));
+  });
+  $('t25').addEventListener('click', function () { setTemp('25'); });
+  $('t0').addEventListener('click', function () { setTemp('0'); });
+
+  document.addEventListener('pointerdown', touch);
+  document.addEventListener('keydown', function (e) {
+    touch();
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    var k = e.key, onBtn = document.activeElement && document.activeElement.tagName === 'BUTTON';
+    if (/^[0-9]$/.test(k)) { press(k); e.preventDefault(); }
+    else if (k === '.' || k === 'Decimal') { press('.'); e.preventDefault(); }
+    else if (k === 'Backspace') { press('del'); e.preventDefault(); }
+    else if (k === 'Escape' || k === 'Delete') { st.fresh = false; press('clr'); }
+    else if (k === 'Enter' && !onBtn) { calc(); e.preventDefault(); }
+    else if (k === 'ArrowLeft') go(st.step - 1);
+    else if (k === 'ArrowRight') go(st.step + 1);
+  });
+
+  // 전체 화면 · 화면 꺼짐 막기 (안 되는 기기에서는 조용히 넘어감)
+  var fsBtn = $('fsBtn'), de = document.documentElement;
+  if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) fsBtn.hidden = true;
+  fsBtn.addEventListener('click', function () {
+    try {
+      var p;
+      if (document.fullscreenElement || document.webkitFullscreenElement) p = (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      else p = (de.requestFullscreen || de.webkitRequestFullscreen).call(de);
+      if (p && p.catch) p.catch(function () {});
+    } catch (e) { /* 전체 화면을 지원하지 않음 */ }
+  });
+  var wakeLock = null;
+  function keepAwake() {
+    if (!('wakeLock' in navigator) || wakeLock) return;
+    navigator.wakeLock.request('screen').then(function (l) {
+      wakeLock = l;
+      l.addEventListener('release', function () { wakeLock = null; });
+    }).catch(function () {});
+  }
+  document.addEventListener('pointerdown', keepAwake);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') keepAwake(); });
+
+  /* ---------- 시작 ---------- */
+  var t0 = '25';
+  try { var saved = localStorage.getItem('breathMole.temp'); if (saved === '0' || saved === '25') t0 = saved; } catch (e) { /* 기본 25 °C */ }
+  if (location.hash === '#0c') t0 = '0';
+  if (location.hash === '#25c') t0 = '25';
+  st.temp = t0;
+  $('t25').setAttribute('aria-pressed', t0 === '25' ? 'true' : 'false');
+  $('t0').setAttribute('aria-pressed', t0 === '0' ? 'true' : 'false');
+  showInput();
+  renderAll();
+  // 웹 글꼴이 늦게 오면 글자 폭이 달라지므로 한 번 더 맞춤
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitStage);
+})();
+</script>
+</body>
+</html>
